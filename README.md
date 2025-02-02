@@ -37,7 +37,7 @@ Bu platforma iştifadəçilər arasında şəxsi və ya biznesə aid olan şəxs
 ## Texniki Stack
 - **Frontend**: React.js / Next.js
 - **Backend**: Node.js (Express)
-- **Database**: PostgreSQL / MongoDB
+- **Database**: MongoDB
 - **Autentifikasiya**: Sima və ya ASAN imza
 - **Hosting**: AWS / Vercel / DigitalOcean
 
