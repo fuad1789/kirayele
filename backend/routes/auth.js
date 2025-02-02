@@ -34,10 +34,7 @@ router.post("/verify-otp", async (req, res) => {
     try {
       // Verify the ID token
       const decodedToken = await admin.auth().verifyIdToken(idToken);
-      console.log("Decoded token:", decodedToken); // Debug log
-
       const phoneNumber = decodedToken.phone_number;
-      console.log("Phone number from token:", phoneNumber); // Debug log
 
       if (!phoneNumber) {
         return res
@@ -45,23 +42,26 @@ router.post("/verify-otp", async (req, res) => {
           .json({ message: "Phone number not found in token" });
       }
 
-      // Check if user exists in our database
-      let dbUser = await User.findOne({ phoneNumber });
-      console.log("Existing user:", dbUser); // Debug log
+      // Check if user exists and has completed registration
+      const user = await User.findOne({ phoneNumber });
 
-      if (!dbUser) {
-        // If user doesn't exist, create a new one with just the phone number
-        dbUser = new User({ phoneNumber });
-        try {
-          await dbUser.save();
-          console.log("New user created:", dbUser); // Debug log
-        } catch (saveError) {
-          console.error("Error saving user:", saveError);
-          return res.status(500).json({ message: "Error creating user" });
-        }
+      if (!user) {
+        // Create a new user with just the phone number
+        const newUser = new User({ phoneNumber });
+        await newUser.save();
+        return res.json({
+          user: newUser,
+          isRegistrationComplete: false,
+        });
       }
 
-      res.json({ user: dbUser });
+      // Check if user has completed registration
+      const isRegistrationComplete = !!(user.firstName && user.lastName);
+
+      res.json({
+        user,
+        isRegistrationComplete,
+      });
     } catch (verifyError) {
       console.error("Firebase verification error:", verifyError);
       return res.status(401).json({

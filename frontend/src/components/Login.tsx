@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -10,27 +10,35 @@ import {
   Paper,
   CircularProgress,
 } from "@mui/material";
+import axios from "axios";
 
 const Login = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [verificationId, setVerificationId] = useState("");
+  const [otp, setOtp] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showOtpInput, setShowOtpInput] = useState(false);
 
-  const { sendOTP, verifyOTP } = useAuth();
+  const { sendOTP, verifyOTP, currentUser } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (currentUser) {
+      navigate("/dashboard");
+    }
+  }, [currentUser, navigate]);
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+    setLoading(true);
 
     try {
-      const result = await sendOTP(phoneNumber);
-      setVerificationId(result.verificationId);
-      setStep("otp");
+      const confirmationResult = await sendOTP(phoneNumber);
+      setVerificationId(confirmationResult.verificationId);
+      setShowOtpInput(true);
     } catch (error: any) {
       setError(error.message || "Failed to send OTP");
     } finally {
@@ -40,12 +48,19 @@ const Login = () => {
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+    setLoading(true);
 
     try {
-      await verifyOTP(verificationId, otp);
-      navigate("/register");
+      const response = await verifyOTP(verificationId, otp);
+
+      // If user exists and has completed registration, redirect to dashboard
+      if (response.user.firstName && response.user.lastName) {
+        navigate("/dashboard");
+      } else {
+        // If user hasn't completed registration, redirect to register
+        navigate("/register");
+      }
     } catch (error: any) {
       setError(error.message || "Failed to verify OTP");
     } finally {
@@ -58,7 +73,7 @@ const Login = () => {
       <Box sx={{ mt: 8 }}>
         <Paper elevation={3} sx={{ p: 4 }}>
           <Typography component="h1" variant="h5" align="center" gutterBottom>
-            {step === "phone" ? "Enter Phone Number" : "Enter OTP"}
+            Sign in to your account
           </Typography>
 
           {error && (
@@ -67,7 +82,7 @@ const Login = () => {
             </Typography>
           )}
 
-          {step === "phone" ? (
+          {!showOtpInput ? (
             <form onSubmit={handleSendOTP}>
               <TextField
                 fullWidth

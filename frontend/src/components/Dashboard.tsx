@@ -19,51 +19,29 @@ interface UserData {
 }
 
 const Dashboard = () => {
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { currentUser, userData, logout } = useAuth();
+  const navigate = useNavigate();
   const [error, setError] = useState("");
 
-  const { currentUser, logout } = useAuth();
-  const navigate = useNavigate();
-
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const token = await currentUser?.getIdToken();
-        const response = await axios.get("http://localhost:5000/auth/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUserData(response.data.user);
-      } catch (error: any) {
-        setError(error.message || "Failed to fetch user data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, [currentUser]);
+    // If no user is logged in, redirect to login
+    if (!currentUser) {
+      navigate("/login");
+    }
+  }, [currentUser, navigate]);
 
   const handleLogout = async () => {
     try {
       await logout();
       navigate("/login");
     } catch (error: any) {
-      setError(error.message || "Failed to logout");
+      setError(error.message || "Failed to log out");
     }
   };
 
-  if (loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <CircularProgress />
-      </Box>
-    );
+  // Don't render anything while checking authentication or if user hasn't completed registration
+  if (!currentUser || !userData?.firstName || !userData?.lastName) {
+    return null;
   }
 
   return (
