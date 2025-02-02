@@ -15,12 +15,19 @@ import {
   User as FirebaseUser,
 } from "firebase/auth";
 import axios from "axios";
+import {
+  getReCaptchaToken,
+  initRecaptcha,
+  checkSessionExpiration,
+  updateLastActivity,
+  clearAuthData,
+} from "../utils/auth";
 
 interface User {
+  _id: string;
   phoneNumber: string;
   firstName?: string;
   lastName?: string;
-  _id: string;
 }
 
 interface AuthContextType {
@@ -50,10 +57,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [userData, setUserData] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Define logout function first using useCallback
+  // Initialize axios interceptors
+  useEffect(() => {
+    // Add request interceptor for authentication
+    const requestInterceptor = axios.interceptors.request.use(
+      async (config) => {
+        // Update last activity timestamp
+        updateLastActivity();
+
+        // Add Firebase ID token to Authorization header if user is logged in
+        if (auth.currentUser) {
+          const idToken = await auth.currentUser.getIdToken();
+          config.headers.Authorization = `Bearer ${idToken}`;
+        }
+
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Add response interceptor for handling auth errors
+    const responseInterceptor = axios.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (error.response?.status === 401) {
+          // Clear auth data and redirect to login
+          await logout();
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // Initialize reCAPTCHA
+    initRecaptcha();
+
+    return () => {
+      axios.interceptors.request.eject(requestInterceptor);
+      axios.interceptors.response.eject(responseInterceptor);
+    };
+  }, []);
+
+  // Check session expiration periodically
+  useEffect(() => {
+    const checkSession = () => {
+      if (checkSessionExpiration()) {
+        logout();
+      }
+    };
+
+    const interval = setInterval(checkSession, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
+
   const logout = useCallback(async () => {
     try {
+      await axios.post("/auth/logout");
       await auth.signOut();
+      clearAuthData();
       setUserData(null);
     } catch (error) {
       console.error("Error logging out:", error);
@@ -61,106 +121,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  // Set up axios interceptor for authentication
-  useEffect(() => {
-    const interceptor = axios.interceptors.request.use(
-      async (config) => {
-        try {
-          if (currentUser) {
-            // Force token refresh if it's close to expiring
-            const token = await currentUser.getIdToken(true);
-            config.headers.Authorization = `Bearer ${token}`;
-          }
-          return config;
-        } catch (error) {
-          console.error("Error getting auth token:", error);
-          // If we can't get a token, we should probably log the user out
-          await logout();
-          return Promise.reject(error);
-        }
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
-
-    // Add response interceptor to handle 401 errors
-    const responseInterceptor = axios.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        if (error.response?.status === 401 && currentUser) {
-          try {
-            // Try to get a fresh token
-            const token = await currentUser.getIdToken(true);
-            error.config.headers.Authorization = `Bearer ${token}`;
-            // Retry the original request with the new token
-            return axios(error.config);
-          } catch (refreshError) {
-            console.error("Error refreshing token:", refreshError);
-            // If we can't refresh the token, log the user out
-            await logout();
-          }
-        }
-        return Promise.reject(error);
-      }
-    );
-
-    return () => {
-      axios.interceptors.request.eject(interceptor);
-      axios.interceptors.response.eject(responseInterceptor);
-    };
-  }, [currentUser, logout]);
-
-  // Handle Firebase auth state changes
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      setLoading(true);
-
-      if (user) {
-        try {
-          // Get a fresh token before making the request
-          const token = await user.getIdToken(true);
-          const response = await axios.get("http://localhost:5000/auth/me", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          setUserData(response.data.user);
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-          // If we get a 401, try to refresh the token once more
-          if (axios.isAxiosError(error) && error.response?.status === 401) {
-            try {
-              const freshToken = await user.getIdToken(true);
-              const retryResponse = await axios.get(
-                "http://localhost:5000/auth/me",
-                {
-                  headers: {
-                    Authorization: `Bearer ${freshToken}`,
-                  },
-                }
-              );
-              setUserData(retryResponse.data.user);
-            } catch (retryError) {
-              console.error("Error retrying user data fetch:", retryError);
-              // If retry fails, log out the user
-              await logout();
-            }
-          }
-        }
-      } else {
-        setUserData(null);
-      }
-
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [logout]);
-
   const sendOTP = async (phoneNumber: string) => {
     try {
+      // Get reCAPTCHA token
+      const recaptchaToken = await getReCaptchaToken();
+
+      // Initialize reCAPTCHA verifier
       const recaptchaVerifier = new RecaptchaVerifier(
         auth,
         "recaptcha-container",
@@ -169,17 +135,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       );
 
-      const confirmationResult = await signInWithPhoneNumber(
-        auth,
+      // Send OTP
+      await axios.post("/auth/send-otp", {
         phoneNumber,
-        recaptchaVerifier
-      );
-
-      await axios.post("http://localhost:5000/auth/send-otp", {
-        phoneNumber,
+        recaptchaToken,
       });
 
-      return confirmationResult;
+      return signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
     } catch (error) {
       console.error("Error sending OTP:", error);
       throw error;
@@ -188,14 +150,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const verifyOTP = async (verificationId: string, code: string) => {
     try {
+      // Get reCAPTCHA token
+      const recaptchaToken = await getReCaptchaToken();
+
+      // Verify OTP with Firebase
       const credential = PhoneAuthProvider.credential(verificationId, code);
       const userCredential = await signInWithCredential(auth, credential);
       const idToken = await userCredential.user.getIdToken();
 
-      const response = await axios.post(
-        "http://localhost:5000/auth/verify-otp",
-        { idToken }
-      );
+      // Get device information
+      const deviceInfo = getDeviceInfo();
+
+      // Verify with backend
+      const response = await axios.post("/auth/verify-otp", {
+        idToken,
+        deviceInfo,
+        recaptchaToken,
+      });
 
       setUserData(response.data.user);
       return response.data;
@@ -207,9 +178,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const registerUser = async (firstName: string, lastName: string) => {
     try {
-      const response = await axios.post("http://localhost:5000/auth/register", {
+      // Get reCAPTCHA token
+      const recaptchaToken = await getReCaptchaToken();
+
+      const response = await axios.post("/auth/register", {
         firstName,
         lastName,
+        recaptchaToken,
       });
 
       setUserData(response.data.user);
@@ -219,6 +194,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw error;
     }
   };
+
+  // Handle Firebase auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      setLoading(true);
+
+      if (user) {
+        try {
+          const response = await axios.get("/api/me");
+          setUserData(response.data.user);
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+          await logout();
+        }
+      } else {
+        setUserData(null);
+      }
+
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [logout]);
 
   const value = {
     currentUser,
@@ -230,9 +229,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     logout,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

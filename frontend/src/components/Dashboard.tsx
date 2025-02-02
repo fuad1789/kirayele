@@ -9,22 +9,15 @@ import {
   Button,
   CircularProgress,
 } from "@mui/material";
-import axios from "axios";
-
-interface UserData {
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-  createdAt: string;
-}
+import { ExitToApp as LogoutIcon } from "@mui/icons-material";
 
 const Dashboard = () => {
   const { currentUser, userData, logout } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // If no user is logged in, redirect to login
     if (!currentUser) {
       navigate("/login");
     }
@@ -32,14 +25,16 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     try {
+      setLoading(true);
       await logout();
       navigate("/login");
     } catch (error: any) {
       setError(error.message || "Failed to log out");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Don't render anything while checking authentication or if user hasn't completed registration
   if (!currentUser || !userData?.firstName || !userData?.lastName) {
     return null;
   }
@@ -58,33 +53,30 @@ const Dashboard = () => {
             </Typography>
           )}
 
-          {userData && (
-            <Box sx={{ mt: 4 }}>
-              <Typography variant="h6" gutterBottom>
-                Profile Information
-              </Typography>
-              <Typography>
-                <strong>Name:</strong> {userData.firstName} {userData.lastName}
-              </Typography>
-              <Typography>
-                <strong>Phone:</strong> {userData.phoneNumber}
-              </Typography>
-              <Typography>
-                <strong>Member Since:</strong>{" "}
-                {new Date(userData.createdAt).toLocaleDateString()}
-              </Typography>
-            </Box>
-          )}
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              Profile Information
+            </Typography>
+            <Typography>
+              <strong>Name:</strong> {userData.firstName} {userData.lastName}
+            </Typography>
+            <Typography>
+              <strong>Phone:</strong> {userData.phoneNumber}
+            </Typography>
+          </Box>
 
-          <Button
-            fullWidth
-            variant="contained"
-            color="primary"
-            onClick={handleLogout}
-            sx={{ mt: 4 }}
-          >
-            Logout
-          </Button>
+          <Box sx={{ mt: 4 }}>
+            <Button
+              fullWidth
+              variant="contained"
+              color="primary"
+              onClick={handleLogout}
+              disabled={loading}
+              startIcon={<LogoutIcon />}
+            >
+              {loading ? <CircularProgress size={24} /> : "Logout"}
+            </Button>
+          </Box>
         </Paper>
       </Box>
     </Container>

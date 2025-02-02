@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import {
   getAuth,
   setPersistence,
-  browserLocalPersistence,
+  browserSessionPersistence,
 } from "firebase/auth";
 
 const firebaseConfig = {
@@ -17,10 +17,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Set persistence to local to persist the auth state
-setPersistence(auth, browserLocalPersistence)
+// Set persistence to session instead of local for better security
+setPersistence(auth, browserSessionPersistence)
   .then(() => {
-    console.log("Firebase persistence set to local");
+    console.log("Firebase persistence set to session");
   })
   .catch((error) => {
     console.error("Error setting persistence:", error);
