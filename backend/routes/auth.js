@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const admin = require("../config/firebase");
 const User = require("../models/User");
-const { authLimiter } = require("../middleware/rateLimiter");
 const { generateAccessToken, generateRefreshToken } = require("../utils/jwt");
 const axios = require("axios");
 
@@ -26,9 +25,6 @@ const verifyRecaptcha = async (token) => {
   }
 };
 
-// Apply rate limiter to all auth routes
-router.use(authLimiter);
-
 // Send OTP
 router.post("/send-otp", async (req, res) => {
   try {
@@ -48,11 +44,6 @@ router.post("/send-otp", async (req, res) => {
     const user = await User.findOne({ phoneNumber });
     if (user && user.isBlocked) {
       return res.status(403).json({ message: "Account is blocked" });
-    }
-
-    // Check if account is locked due to too many attempts
-    if (user && user.isLocked()) {
-      return res.status(403).json({ message: "Account is temporarily locked" });
     }
 
     res.json({ success: true });
@@ -156,10 +147,10 @@ router.post("/verify-otp", async (req, res) => {
 router.post("/register", async (req, res) => {
   try {
     const { firstName, lastName, recaptchaToken } = req.body;
-    const accessToken = req.cookies["access_token"];
+    const token = req.headers.authorization?.split("Bearer ")[1];
 
-    if (!accessToken) {
-      return res.status(401).json({ message: "Access token required" });
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
     }
 
     // Verify reCAPTCHA
@@ -174,8 +165,9 @@ router.post("/register", async (req, res) => {
         .json({ message: "First name and last name are required" });
     }
 
-    const decoded = verifyToken(accessToken);
-    const user = await User.findById(decoded.userId);
+    // Verify Firebase ID token
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const user = await User.findOne({ phoneNumber: decodedToken.phone_number });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });

@@ -21,6 +21,7 @@ import {
   checkSessionExpiration,
   updateLastActivity,
   clearAuthData,
+  getDeviceInfo,
 } from "../utils/auth";
 
 interface User {
@@ -35,7 +36,10 @@ interface AuthContextType {
   userData: User | null;
   loading: boolean;
   sendOTP: (phoneNumber: string) => Promise<any>;
-  verifyOTP: (verificationId: string, code: string) => Promise<any>;
+  verifyOTP: (
+    verificationId: string,
+    code: string
+  ) => Promise<{ isNewUser: boolean }>;
   registerUser: (firstName: string, lastName: string) => Promise<any>;
   logout: () => Promise<void>;
 }
@@ -123,27 +127,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const sendOTP = async (phoneNumber: string) => {
     try {
-      // Get reCAPTCHA token
-      const recaptchaToken = await getReCaptchaToken();
+      // Initialize reCAPTCHA verifier if not already initialized
+      if (!window.recaptchaVerifier) {
+        window.recaptchaVerifier = new RecaptchaVerifier(
+          auth,
+          "recaptcha-container",
+          {
+            size: "invisible",
+            callback: () => {
+              // reCAPTCHA solved, allow signInWithPhoneNumber.
+            },
+          }
+        );
+      }
 
-      // Initialize reCAPTCHA verifier
-      const recaptchaVerifier = new RecaptchaVerifier(
+      // Send OTP using Firebase
+      const confirmationResult = await signInWithPhoneNumber(
         auth,
-        "recaptcha-container",
-        {
-          size: "invisible",
-        }
+        phoneNumber,
+        window.recaptchaVerifier
       );
 
-      // Send OTP
-      await axios.post("/auth/send-otp", {
-        phoneNumber,
-        recaptchaToken,
-      });
-
-      return signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+      return confirmationResult;
     } catch (error) {
       console.error("Error sending OTP:", error);
+      // Reset reCAPTCHA verifier
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = null;
+      }
       throw error;
     }
   };
@@ -168,8 +180,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         recaptchaToken,
       });
 
-      setUserData(response.data.user);
-      return response.data;
+      if (response.data.user) {
+        setUserData(response.data.user);
+      }
+
+      return {
+        isNewUser:
+          !response.data.user?.firstName || !response.data.user?.lastName,
+      };
     } catch (error) {
       console.error("Error verifying OTP:", error);
       throw error;

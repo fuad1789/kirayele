@@ -48,9 +48,9 @@ userSchema.methods.incrementLoginAttempts = async function () {
   // Otherwise increment login attempts
   const updates = { $inc: { loginAttempts: 1 } };
   // Lock the account if we've reached max attempts and haven't locked it yet
-  if (this.loginAttempts + 1 >= 5 && !this.lockUntil) {
+  if (this.loginAttempts + 1 >= 10 && !this.lockUntil) {
     updates.$set = {
-      lockUntil: Date.now() + 2 * 60 * 60 * 1000, // Lock for 2 hours
+      lockUntil: Date.now() + 30 * 60 * 1000, // Lock for 30 minutes instead of 2 hours
     };
   }
   return this.updateOne(updates);

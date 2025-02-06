@@ -7,18 +7,46 @@ import {
 } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider, createTheme } from "@mui/material";
-import Login from "./components/Login";
-import Register from "./components/Register";
+import Auth from "./components/auth/Auth";
 import Dashboard from "./components/Dashboard";
 import { useAuth } from "./contexts/AuthContext";
 
 const theme = createTheme({
   palette: {
     primary: {
+      light: "#4dabf5",
       main: "#1976d2",
+      dark: "#1565c0",
     },
     secondary: {
-      main: "#dc004e",
+      light: "#ff4081",
+      main: "#f50057",
+      dark: "#c51162",
+    },
+  },
+  typography: {
+    fontFamily: "'Segoe UI', 'Roboto', 'Arial', sans-serif",
+    h4: {
+      fontWeight: 600,
+    },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: "none",
+          borderRadius: 8,
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 8,
+          },
+        },
+      },
     },
   },
 });
@@ -27,8 +55,12 @@ const theme = createTheme({
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { currentUser } = useAuth();
-  return currentUser ? <>{children}</> : <Navigate to="/login" />;
+  const { currentUser, userData } = useAuth();
+  return currentUser && userData?.firstName && userData?.lastName ? (
+    <>{children}</>
+  ) : (
+    <Navigate to="/auth" />
+  );
 };
 
 const App = () => {
@@ -37,15 +69,7 @@ const App = () => {
       <Router>
         <AuthProvider>
           <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/register"
-              element={
-                <ProtectedRoute>
-                  <Register />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/auth" element={<Auth />} />
             <Route
               path="/dashboard"
               element={
@@ -54,7 +78,7 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
-            <Route path="/" element={<Navigate to="/login" />} />
+            <Route path="/" element={<Navigate to="/auth" />} />
           </Routes>
         </AuthProvider>
       </Router>
