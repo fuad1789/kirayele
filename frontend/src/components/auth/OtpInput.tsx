@@ -96,8 +96,12 @@ const OtpInput: React.FC<OtpInputProps> = ({
             <TextField
               inputRef={(el) => (inputRefs.current[index] = el)}
               value={value[index] || ""}
-              onChange={(e) => handleChange(index, e)}
-              onKeyDown={(e) => handleKeyDown(index, e)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange(index, e)
+              }
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                handleKeyDown(index, e)
+              }
               onPaste={handlePaste}
               disabled={disabled}
               inputProps={{

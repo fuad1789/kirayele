@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -30,7 +30,6 @@ const Auth = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
-  const [isNewUser, setIsNewUser] = useState<boolean | null>(null);
   const theme = useTheme();
 
   const { sendOTP, verifyOTP, registerUser, currentUser, userData } = useAuth();
@@ -83,7 +82,6 @@ const Auth = () => {
         confirmationResult.verificationId,
         otp
       );
-      setIsNewUser(newUser);
 
       if (newUser) {
         setStep(2);
