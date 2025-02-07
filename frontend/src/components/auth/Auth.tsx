@@ -78,19 +78,35 @@ const Auth = () => {
       if (!confirmationResult) {
         throw new Error("Phone verification not initiated");
       }
-      const { isNewUser: newUser } = await verifyOTP(
+      const { isNewUser } = await verifyOTP(
         confirmationResult.verificationId,
         otp
       );
 
-      if (newUser) {
+      // Add a small delay to ensure state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      if (isNewUser) {
+        console.log("New user detected, moving to registration step");
         setStep(2);
       } else {
+        console.log("Existing user detected, navigating to dashboard");
         navigate("/dashboard");
       }
     } catch (error: any) {
       console.error("OTP verification error:", error);
-      setError(error.message || "Xəta baş verdi");
+      if (error.message?.includes("reCAPTCHA")) {
+        setError(
+          "Təhlükəsizlik yoxlaması uğursuz oldu. Zəhmət olmasa səhifəni yeniləyin və yenidən cəhd edin."
+        );
+      } else if (error.message?.includes("expired")) {
+        setError("Təsdiq kodunun müddəti bitib. Zəhmət olmasa yeni kod alın.");
+        setStep(0);
+      } else {
+        setError(
+          error.message || "Xəta baş verdi. Zəhmət olmasa yenidən cəhd edin."
+        );
+      }
     } finally {
       setLoading(false);
     }

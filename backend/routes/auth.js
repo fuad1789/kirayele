@@ -56,7 +56,7 @@ router.post("/send-otp", async (req, res) => {
 // Verify OTP and Register/Login User
 router.post("/verify-otp", async (req, res) => {
   try {
-    const { idToken, recaptchaToken } = req.body;
+    const { idToken, recaptchaToken, deviceInfo } = req.body;
 
     if (!idToken) {
       return res.status(400).json({ message: "ID token is required" });
@@ -65,7 +65,11 @@ router.post("/verify-otp", async (req, res) => {
     // Verify reCAPTCHA
     const isRecaptchaValid = await verifyRecaptcha(recaptchaToken);
     if (!isRecaptchaValid) {
-      return res.status(400).json({ message: "Invalid reCAPTCHA" });
+      return res
+        .status(400)
+        .json({
+          message: "Invalid reCAPTCHA. Please refresh the page and try again.",
+        });
     }
 
     try {
@@ -79,14 +83,28 @@ router.post("/verify-otp", async (req, res) => {
           .json({ message: "Phone number not found in token" });
       }
 
-      // Find or create user
-      let user = await User.findOne({ phoneNumber });
+      // Find or create user with better error handling
+      let user = await User.findOne({ phoneNumber }).exec();
+      const isNewUser = !user;
 
       if (!user) {
-        // Create new user
-        user = new User({ phoneNumber });
-        await user.save();
+        try {
+          // Create new user
+          user = new User({ phoneNumber });
+          await user.save();
+          console.log(`New user created with phone: ${phoneNumber}`);
+        } catch (createError) {
+          console.error("Error creating new user:", createError);
+          return res
+            .status(500)
+            .json({ message: "Error creating user account" });
+        }
       } else {
+        // Check if user is blocked
+        if (user.isBlocked) {
+          return res.status(403).json({ message: "Account is blocked" });
+        }
+
         // Reset login attempts on successful verification
         if (user.loginAttempts > 0) {
           await User.findByIdAndUpdate(user._id, {
@@ -99,6 +117,7 @@ router.post("/verify-otp", async (req, res) => {
       const accessToken = generateAccessToken(user._id);
       const refreshToken = generateRefreshToken(user._id);
 
+      // Update user's refresh tokens
       await User.findByIdAndUpdate(user._id, {
         $push: {
           refreshTokens: refreshToken,
@@ -120,7 +139,12 @@ router.post("/verify-otp", async (req, res) => {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
-      const isRegistrationComplete = !!(user.firstName && user.lastName);
+      console.log(
+        `User ${
+          isNewUser ? "registration" : "login"
+        } successful for phone: ${phoneNumber}`
+      );
+
       res.json({
         user: {
           _id: user._id,
@@ -128,18 +152,21 @@ router.post("/verify-otp", async (req, res) => {
           firstName: user.firstName,
           lastName: user.lastName,
         },
-        isRegistrationComplete,
+        isNewUser,
       });
     } catch (verifyError) {
       console.error("Firebase verification error:", verifyError);
       return res.status(401).json({
-        message: "Invalid ID token",
+        message:
+          verifyError.code === "auth/id-token-expired"
+            ? "Verification session expired. Please request a new code."
+            : "Invalid verification code",
         details: verifyError.message,
       });
     }
   } catch (error) {
     console.error("Verify OTP Error:", error);
-    res.status(500).json({ message: "Error verifying OTP" });
+    res.status(500).json({ message: "Error verifying OTP. Please try again." });
   }
 });
 
