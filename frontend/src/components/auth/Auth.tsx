@@ -37,7 +37,20 @@ const Auth = () => {
 
   useEffect(() => {
     if (currentUser && userData?.firstName && userData?.lastName) {
+      console.log("Redirecting to dashboard:", {
+        hasCurrentUser: !!currentUser,
+        hasUserData: !!userData,
+        hasFirstName: !!userData?.firstName,
+        hasLastName: !!userData?.lastName,
+      });
       navigate("/dashboard");
+    } else {
+      console.log("Not redirecting:", {
+        hasCurrentUser: !!currentUser,
+        hasUserData: !!userData,
+        hasFirstName: !!userData?.firstName,
+        hasLastName: !!userData?.lastName,
+      });
     }
   }, [currentUser, userData, navigate]);
 
@@ -88,10 +101,11 @@ const Auth = () => {
       setError("");
 
       if (isNewUser) {
-        console.log("User needs to complete profile, moving to step 2");
+        console.log("New user detected, moving to registration step");
         setStep(2);
       } else {
-        console.log("User profile complete, useEffect will handle navigation");
+        console.log("Existing user detected, waiting for redirect");
+        // The useEffect will handle navigation if userData is complete
       }
     } catch (error: any) {
       console.error("OTP verification error:", error);
@@ -119,9 +133,12 @@ const Auth = () => {
     setError("");
     setLoading(true);
     try {
+      console.log("Starting user registration");
       await registerUser(firstName.trim(), lastName.trim());
+      console.log("Registration successful, waiting for redirect");
       // Navigation will be handled by useEffect after userData updates
     } catch (error: any) {
+      console.error("Registration error:", error);
       setError(error.message || "Xəta baş verdi");
     } finally {
       setLoading(false);

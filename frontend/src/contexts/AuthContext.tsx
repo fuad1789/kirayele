@@ -180,26 +180,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         recaptchaToken,
       });
 
+      // Set current user first
+      setCurrentUser(userCredential.user);
+
       // Determine if user is new based on missing name fields
       const isNewUser =
         !response.data.user?.firstName || !response.data.user?.lastName;
 
-      // Only set user data if the user is not new (has complete profile)
-      if (!isNewUser) {
+      // Only set user data if the user has complete profile
+      if (!isNewUser && response.data.user) {
         setUserData(response.data.user);
+      } else {
+        // Explicitly set userData to null for new users
+        setUserData(null);
       }
 
-      console.log("verifyOTP response:", {
+      console.log("verifyOTP complete:", {
         user: response.data.user,
         isNewUser,
         hasFirstName: !!response.data.user?.firstName,
         hasLastName: !!response.data.user?.lastName,
+        currentUser: !!userCredential.user,
       });
 
       return { isNewUser };
     } catch (error) {
       console.error("Error verifying OTP:", error);
-      // Reset user data on error
+      // Reset all auth state on error
+      setCurrentUser(null);
       setUserData(null);
       throw error;
     }
@@ -216,7 +224,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         recaptchaToken,
       });
 
-      setUserData(response.data.user);
+      console.log("Registration complete:", {
+        user: response.data.user,
+        hasData: !!response.data.user,
+      });
+
+      // Only set user data if we have valid data
+      if (response.data.user?._id && response.data.user?.phoneNumber) {
+        setUserData(response.data.user);
+      }
+
       return response.data;
     } catch (error) {
       console.error("Error registering user:", error);
