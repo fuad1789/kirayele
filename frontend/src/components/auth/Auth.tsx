@@ -38,14 +38,8 @@ const Auth = () => {
   useEffect(() => {
     if (currentUser && userData?.firstName && userData?.lastName) {
       navigate("/dashboard");
-    } else if (
-      currentUser &&
-      (!userData?.firstName || !userData?.lastName) &&
-      step !== 2
-    ) {
-      setStep(2);
     }
-  }, [currentUser, userData, navigate, step]);
+  }, [currentUser, userData, navigate]);
 
   const handlePhoneSubmit = async () => {
     if (phone.length !== 9) {
@@ -90,9 +84,12 @@ const Auth = () => {
       // Clear any existing errors
       setError("");
 
-      if (result.isNewUser) {
-        // Set step to 2 for new users who need to enter name/surname
+      // Always check the userData after verification
+      if (!userData?.firstName || !userData?.lastName) {
+        console.log("User needs to complete profile, moving to step 2");
         setStep(2);
+      } else {
+        console.log("User profile complete, useEffect will handle navigation");
       }
     } catch (error: any) {
       console.error("OTP verification error:", error);
@@ -123,7 +120,7 @@ const Auth = () => {
     setLoading(true);
     try {
       await registerUser(firstName.trim(), lastName.trim());
-      navigate("/dashboard");
+      // Navigation will be handled by useEffect after userData updates
     } catch (error: any) {
       setError(error.message || "Xəta baş verdi");
     } finally {
