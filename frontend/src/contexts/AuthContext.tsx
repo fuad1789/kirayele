@@ -180,16 +180,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         recaptchaToken,
       });
 
+      // Set user data first
       if (response.data.user) {
-        setUserData(response.data.user);
+        await setUserData(response.data.user);
       }
 
-      return {
-        isNewUser:
-          !response.data.user?.firstName || !response.data.user?.lastName,
-      };
+      // Determine if user is new based on missing name fields
+      const isNewUser =
+        !response.data.user?.firstName || !response.data.user?.lastName;
+
+      console.log("verifyOTP response:", {
+        user: response.data.user,
+        isNewUser,
+        hasFirstName: !!response.data.user?.firstName,
+        hasLastName: !!response.data.user?.lastName,
+      });
+
+      return { isNewUser };
     } catch (error) {
       console.error("Error verifying OTP:", error);
+      // Reset user data on error
+      setUserData(null);
       throw error;
     }
   };

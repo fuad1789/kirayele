@@ -78,19 +78,19 @@ const Auth = () => {
       if (!confirmationResult) {
         throw new Error("Phone verification not initiated");
       }
-      const { isNewUser } = await verifyOTP(
-        confirmationResult.verificationId,
-        otp
-      );
 
-      // Add a small delay to ensure state updates are processed
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      const result = await verifyOTP(confirmationResult.verificationId, otp);
 
-      if (isNewUser) {
+      // Clear any existing errors
+      setError("");
+
+      if (result.isNewUser) {
+        // Ensure we're setting the step after a successful verification
         console.log("New user detected, moving to registration step");
         setStep(2);
       } else {
         console.log("Existing user detected, navigating to dashboard");
+        // Only navigate if the user is not new
         navigate("/dashboard");
       }
     } catch (error: any) {
@@ -101,7 +101,8 @@ const Auth = () => {
         );
       } else if (error.message?.includes("expired")) {
         setError("Təsdiq kodunun müddəti bitib. Zəhmət olmasa yeni kod alın.");
-        setStep(0);
+        // Don't automatically go back to step 0 on expiration
+        // Let user choose to go back using the "Change number" button
       } else {
         setError(
           error.message || "Xəta baş verdi. Zəhmət olmasa yenidən cəhd edin."
