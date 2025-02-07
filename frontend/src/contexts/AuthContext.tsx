@@ -14,7 +14,7 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from "firebase/auth";
-import axios from "axios";
+import axios from "../config/axios";
 import {
   getReCaptchaToken,
   initRecaptcha,
