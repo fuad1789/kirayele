@@ -79,7 +79,7 @@ const Auth = () => {
         throw new Error("Phone verification not initiated");
       }
 
-      const result = await verifyOTP(confirmationResult.verificationId, otp);
+      await verifyOTP(confirmationResult.verificationId, otp);
 
       // Clear any existing errors
       setError("");
