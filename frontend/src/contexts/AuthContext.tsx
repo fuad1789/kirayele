@@ -180,34 +180,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         recaptchaToken,
       });
 
-      // Set current user first
-      setCurrentUser(userCredential.user);
-
       // Determine if user is new based on missing name fields
       const isNewUser =
         !response.data.user?.firstName || !response.data.user?.lastName;
 
-      // Only set user data if the user has complete profile
-      if (!isNewUser && response.data.user) {
-        setUserData(response.data.user);
-      } else {
-        // Explicitly set userData to null for new users
-        setUserData(null);
-      }
-
       console.log("verifyOTP complete:", {
-        user: response.data.user,
         isNewUser,
         hasFirstName: !!response.data.user?.firstName,
         hasLastName: !!response.data.user?.lastName,
         currentUser: !!userCredential.user,
       });
 
+      // For new users, we don't set the userData yet
+      if (
+        !isNewUser &&
+        response.data.user?._id &&
+        response.data.user?.phoneNumber
+      ) {
+        setUserData(response.data.user);
+      } else {
+        setUserData(null);
+      }
+
       return { isNewUser };
     } catch (error) {
       console.error("Error verifying OTP:", error);
-      // Reset all auth state on error
-      setCurrentUser(null);
       setUserData(null);
       throw error;
     }
@@ -244,18 +241,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // Handle Firebase auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Firebase auth state changed:", {
+        hasUser: !!user,
+        userId: user?.uid,
+      });
+
       setCurrentUser(user);
       setLoading(true);
 
       if (user) {
         try {
           const response = await axios.get("/api/me");
-          setUserData(response.data.user);
+          if (response.data.user?._id && response.data.user?.phoneNumber) {
+            console.log("Setting user data from auth state change:", {
+              hasUser: true,
+              hasFirstName: !!response.data.user?.firstName,
+              hasLastName: !!response.data.user?.lastName,
+            });
+            setUserData(response.data.user);
+          } else {
+            console.log("Incomplete user data from /api/me");
+            setUserData(null);
+          }
         } catch (error) {
           console.error("Error fetching user data:", error);
-          await logout();
+          setUserData(null);
+          // Don't logout here, as it might interfere with registration flow
         }
       } else {
+        console.log("No Firebase user, clearing user data");
         setUserData(null);
       }
 
@@ -263,7 +277,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     return () => unsubscribe();
-  }, [logout]);
+  }, []);
 
   const value = {
     currentUser,

@@ -30,18 +30,26 @@ const Auth = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
+  const [isRegistrationFlow, setIsRegistrationFlow] = useState(false);
   const theme = useTheme();
 
   const { sendOTP, verifyOTP, registerUser, currentUser, userData } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (currentUser && userData?.firstName && userData?.lastName) {
+    // Only redirect if we have complete user data and it's not a registration flow
+    if (
+      currentUser &&
+      userData?.firstName &&
+      userData?.lastName &&
+      !isRegistrationFlow
+    ) {
       console.log("Redirecting to dashboard:", {
         hasCurrentUser: !!currentUser,
         hasUserData: !!userData,
         hasFirstName: !!userData?.firstName,
         hasLastName: !!userData?.lastName,
+        isRegistrationFlow,
       });
       navigate("/dashboard");
     } else {
@@ -50,9 +58,11 @@ const Auth = () => {
         hasUserData: !!userData,
         hasFirstName: !!userData?.firstName,
         hasLastName: !!userData?.lastName,
+        isRegistrationFlow,
+        step,
       });
     }
-  }, [currentUser, userData, navigate]);
+  }, [currentUser, userData, navigate, isRegistrationFlow]);
 
   const handlePhoneSubmit = async () => {
     if (phone.length !== 9) {
@@ -102,10 +112,11 @@ const Auth = () => {
 
       if (isNewUser) {
         console.log("New user detected, moving to registration step");
+        setIsRegistrationFlow(true);
         setStep(2);
       } else {
         console.log("Existing user detected, waiting for redirect");
-        // The useEffect will handle navigation if userData is complete
+        setIsRegistrationFlow(false);
       }
     } catch (error: any) {
       console.error("OTP verification error:", error);
@@ -135,7 +146,8 @@ const Auth = () => {
     try {
       console.log("Starting user registration");
       await registerUser(firstName.trim(), lastName.trim());
-      console.log("Registration successful, waiting for redirect");
+      console.log("Registration successful, clearing registration flow");
+      setIsRegistrationFlow(false);
       // Navigation will be handled by useEffect after userData updates
     } catch (error: any) {
       console.error("Registration error:", error);
