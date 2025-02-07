@@ -61,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [userData, setUserData] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isNewUserRegistration, setIsNewUserRegistration] = useState(false);
 
   // Initialize axios interceptors
   useEffect(() => {
@@ -85,7 +86,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const responseInterceptor = axios.interceptors.response.use(
       (response) => response,
       async (error) => {
-        if (error.response?.status === 401 && !isAuthenticating) {
+        if (
+          error.response?.status === 401 &&
+          !isAuthenticating &&
+          !isNewUserRegistration
+        ) {
           // Clear auth data and redirect to login
           await logout();
         }
@@ -100,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       axios.interceptors.request.eject(requestInterceptor);
       axios.interceptors.response.eject(responseInterceptor);
     };
-  }, []);
+  }, [isAuthenticating, isNewUserRegistration]);
 
   // Check session expiration periodically
   useEffect(() => {
@@ -182,12 +187,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         recaptchaToken,
       });
 
-      // Set current user first
-      setCurrentUser(userCredential.user);
-
       // Determine if user is new based on missing name fields
       const isNewUser =
         !response.data.user?.firstName || !response.data.user?.lastName;
+
+      // Set new user registration state
+      setIsNewUserRegistration(isNewUser);
 
       // Only set user data if user has complete profile
       if (
@@ -197,7 +202,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       ) {
         setUserData(response.data.user);
       } else {
-        // Explicitly set userData to null for new users
         setUserData(null);
       }
 
@@ -212,9 +216,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return { isNewUser };
     } catch (error) {
       console.error("Error verifying OTP:", error);
-      // Reset auth state on error
       setCurrentUser(null);
       setUserData(null);
+      setIsNewUserRegistration(false);
       throw error;
     } finally {
       setIsAuthenticating(false);
@@ -222,7 +226,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const registerUser = async (firstName: string, lastName: string) => {
-    setIsAuthenticating(true);
     try {
       // Get reCAPTCHA token
       const recaptchaToken = await getReCaptchaToken();
@@ -239,7 +242,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         phoneNumber: response.data.user?.phoneNumber,
       });
 
-      // Only set user data if we have valid data
       if (
         response.data.user?._id &&
         response.data.user?.phoneNumber &&
@@ -247,6 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         response.data.user?.lastName
       ) {
         setUserData(response.data.user);
+        setIsNewUserRegistration(false);
         return response.data;
       } else {
         throw new Error("Invalid user data received from server");
@@ -254,8 +257,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (error) {
       console.error("Error registering user:", error);
       throw error;
-    } finally {
-      setIsAuthenticating(false);
     }
   };
 
@@ -266,10 +267,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         hasUser: !!user,
         userId: user?.uid,
         isAuthenticating,
+        isNewUserRegistration,
       });
 
-      if (isAuthenticating) {
-        console.log("Skipping auth state change during authentication");
+      // Skip auth state changes during authentication or new user registration
+      if (isAuthenticating || isNewUserRegistration) {
+        console.log(
+          "Skipping auth state change during authentication/registration"
+        );
         return;
       }
 
@@ -304,7 +309,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     return () => unsubscribe();
-  }, [isAuthenticating]);
+  }, [isAuthenticating, isNewUserRegistration]);
 
   const value = {
     currentUser,

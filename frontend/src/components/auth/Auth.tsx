@@ -39,6 +39,14 @@ const Auth = () => {
   // Reset registration flow when component mounts
   useEffect(() => {
     setIsRegistrationFlow(false);
+    // Reset all form fields
+    setPhone("");
+    setOtp("");
+    setFirstName("");
+    setLastName("");
+    setError("");
+    setConfirmationResult(null);
+    setStep(0);
   }, []);
 
   useEffect(() => {
@@ -67,6 +75,12 @@ const Auth = () => {
         isRegistrationFlow,
         step,
       });
+
+      // If we're in step 2 but not in registration flow, reset to step 0
+      if (step === 2 && !isRegistrationFlow) {
+        console.log("Resetting to step 0 due to invalid state");
+        setStep(0);
+      }
     }
   }, [currentUser, userData, navigate, isRegistrationFlow, step]);
 
@@ -78,8 +92,13 @@ const Auth = () => {
     setError("");
     setLoading(true);
     try {
-      // Reset registration flow when starting new phone verification
+      // Reset registration flow and clear previous data
       setIsRegistrationFlow(false);
+      setOtp("");
+      setFirstName("");
+      setLastName("");
+      setConfirmationResult(null);
+
       const formattedPhone = `+994${phone}`;
       const result = await sendOTP(formattedPhone);
       setConfirmationResult(result);
@@ -93,6 +112,8 @@ const Auth = () => {
       } else {
         setError(error.message || "Xəta baş verdi");
       }
+      // Reset on error
+      setConfirmationResult(null);
     } finally {
       setLoading(false);
     }
@@ -143,8 +164,9 @@ const Auth = () => {
           error.message || "Xəta baş verdi. Zəhmət olmasa yenidən cəhd edin."
         );
       }
-      // Reset registration flow on error
+      // Reset registration flow and OTP on error
       setIsRegistrationFlow(false);
+      setOtp("");
     } finally {
       setLoading(false);
     }
@@ -160,8 +182,8 @@ const Auth = () => {
     try {
       console.log("Starting user registration");
       await registerUser(firstName.trim(), lastName.trim());
-      console.log("Registration successful, clearing registration flow");
-      setIsRegistrationFlow(false);
+      console.log("Registration successful");
+      // Keep registration flow true until redirect happens
     } catch (error: any) {
       console.error("Registration error:", error);
       setError(error.message || "Xəta baş verdi");
