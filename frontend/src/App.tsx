@@ -4,9 +4,15 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
-import { ThemeProvider, createTheme } from "@mui/material";
+import {
+  ThemeProvider,
+  createTheme,
+  CircularProgress,
+  Box,
+} from "@mui/material";
 import Auth from "./components/auth/Auth";
 import Dashboard from "./components/Dashboard";
 import { useAuth } from "./contexts/AuthContext";
@@ -51,15 +57,83 @@ const theme = createTheme({
   },
 });
 
+// Loading component
+const LoadingScreen = () => (
+  <Box
+    display="flex"
+    justifyContent="center"
+    alignItems="center"
+    minHeight="100vh"
+  >
+    <CircularProgress />
+  </Box>
+);
+
 // Protected Route component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { currentUser, userData } = useAuth();
-  return currentUser && userData?.firstName && userData?.lastName ? (
-    <>{children}</>
-  ) : (
-    <Navigate to="/auth" />
+  const { currentUser, userData, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  if (!currentUser || !userData?.firstName || !userData?.lastName) {
+    return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Public Route component (prevents authenticated users from accessing auth pages)
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentUser, userData, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  if (currentUser && userData?.firstName && userData?.lastName) {
+    // Redirect to the intended page or dashboard
+    const from = (location.state as any)?.from?.pathname || "/dashboard";
+    return <Navigate to={from} replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const AppRoutes = () => {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <Routes>
+      <Route
+        path="/auth"
+        element={
+          <PublicRoute>
+            <Auth />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      {/* Add a catch-all route that redirects to dashboard for authenticated users or auth for non-authenticated */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
   );
 };
 
@@ -68,18 +142,7 @@ const App = () => {
     <ThemeProvider theme={theme}>
       <Router>
         <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/" element={<Navigate to="/auth" />} />
-          </Routes>
+          <AppRoutes />
         </AuthProvider>
       </Router>
     </ThemeProvider>
