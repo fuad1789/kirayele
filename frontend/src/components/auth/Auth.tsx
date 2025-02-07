@@ -38,8 +38,14 @@ const Auth = () => {
   useEffect(() => {
     if (currentUser && userData?.firstName && userData?.lastName) {
       navigate("/dashboard");
+    } else if (
+      currentUser &&
+      (!userData?.firstName || !userData?.lastName) &&
+      step !== 2
+    ) {
+      setStep(2);
     }
-  }, [currentUser, userData, navigate]);
+  }, [currentUser, userData, navigate, step]);
 
   const handlePhoneSubmit = async () => {
     if (phone.length !== 9) {
@@ -85,13 +91,8 @@ const Auth = () => {
       setError("");
 
       if (result.isNewUser) {
-        // Ensure we're setting the step after a successful verification
-        console.log("New user detected, moving to registration step");
+        // Set step to 2 for new users who need to enter name/surname
         setStep(2);
-      } else {
-        console.log("Existing user detected, navigating to dashboard");
-        // Only navigate if the user is not new
-        navigate("/dashboard");
       }
     } catch (error: any) {
       console.error("OTP verification error:", error);
