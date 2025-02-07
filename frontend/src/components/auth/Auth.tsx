@@ -36,6 +36,11 @@ const Auth = () => {
   const { sendOTP, verifyOTP, registerUser, currentUser, userData } = useAuth();
   const navigate = useNavigate();
 
+  // Reset registration flow when component mounts
+  useEffect(() => {
+    setIsRegistrationFlow(false);
+  }, []);
+
   useEffect(() => {
     // Only redirect if we have complete user data and it's not a registration flow
     if (
@@ -50,6 +55,7 @@ const Auth = () => {
         hasFirstName: !!userData?.firstName,
         hasLastName: !!userData?.lastName,
         isRegistrationFlow,
+        step,
       });
       navigate("/dashboard");
     } else {
@@ -62,7 +68,7 @@ const Auth = () => {
         step,
       });
     }
-  }, [currentUser, userData, navigate, isRegistrationFlow]);
+  }, [currentUser, userData, navigate, isRegistrationFlow, step]);
 
   const handlePhoneSubmit = async () => {
     if (phone.length !== 9) {
@@ -72,6 +78,8 @@ const Auth = () => {
     setError("");
     setLoading(true);
     try {
+      // Reset registration flow when starting new phone verification
+      setIsRegistrationFlow(false);
       const formattedPhone = `+994${phone}`;
       const result = await sendOTP(formattedPhone);
       setConfirmationResult(result);
@@ -126,11 +134,17 @@ const Auth = () => {
         );
       } else if (error.message?.includes("expired")) {
         setError("Təsdiq kodunun müddəti bitib. Zəhmət olmasa yeni kod alın.");
+        // Reset to phone input step on expiration
+        setStep(0);
+        setOtp("");
+        setConfirmationResult(null);
       } else {
         setError(
           error.message || "Xəta baş verdi. Zəhmət olmasa yenidən cəhd edin."
         );
       }
+      // Reset registration flow on error
+      setIsRegistrationFlow(false);
     } finally {
       setLoading(false);
     }
@@ -148,10 +162,10 @@ const Auth = () => {
       await registerUser(firstName.trim(), lastName.trim());
       console.log("Registration successful, clearing registration flow");
       setIsRegistrationFlow(false);
-      // Navigation will be handled by useEffect after userData updates
     } catch (error: any) {
       console.error("Registration error:", error);
       setError(error.message || "Xəta baş verdi");
+      // Don't clear registration flow on error to allow retry
     } finally {
       setLoading(false);
     }
