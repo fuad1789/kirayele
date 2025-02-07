@@ -17,7 +17,7 @@ export default defineConfig({
           server.middlewares.use(
             (
               req: Connect.IncomingMessage,
-              res: ServerResponse,
+              _res: ServerResponse,
               next: Connect.NextFunction
             ) => {
               const url = req.url;
