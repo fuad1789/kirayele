@@ -1,8 +1,9 @@
 services:
-  - type: web
+  - type: static
     name: kirayele-frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: true
     headers:
       - path: /*
         name: Cache-Control
