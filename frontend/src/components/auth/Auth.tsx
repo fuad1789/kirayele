@@ -79,13 +79,15 @@ const Auth = () => {
         throw new Error("Phone verification not initiated");
       }
 
-      await verifyOTP(confirmationResult.verificationId, otp);
+      const { isNewUser } = await verifyOTP(
+        confirmationResult.verificationId,
+        otp
+      );
 
       // Clear any existing errors
       setError("");
 
-      // Always check the userData after verification
-      if (!userData?.firstName || !userData?.lastName) {
+      if (isNewUser) {
         console.log("User needs to complete profile, moving to step 2");
         setStep(2);
       } else {
@@ -99,8 +101,6 @@ const Auth = () => {
         );
       } else if (error.message?.includes("expired")) {
         setError("Təsdiq kodunun müddəti bitib. Zəhmət olmasa yeni kod alın.");
-        // Don't automatically go back to step 0 on expiration
-        // Let user choose to go back using the "Change number" button
       } else {
         setError(
           error.message || "Xəta baş verdi. Zəhmət olmasa yenidən cəhd edin."

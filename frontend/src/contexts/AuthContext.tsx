@@ -180,14 +180,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         recaptchaToken,
       });
 
-      // Set user data first
-      if (response.data.user) {
-        await setUserData(response.data.user);
-      }
-
       // Determine if user is new based on missing name fields
       const isNewUser =
         !response.data.user?.firstName || !response.data.user?.lastName;
+
+      // Only set user data if the user is not new (has complete profile)
+      if (!isNewUser) {
+        setUserData(response.data.user);
+      }
 
       console.log("verifyOTP response:", {
         user: response.data.user,
